@@ -3489,6 +3489,8 @@ PyDataMem_SetEventHook(PyDataMem_EventHookFunc *newhook,
     return temp;
 }
 
+#include <sys/mman.h>
+
 /*NUMPY_API
  * Allocates memory for array data.
  */
@@ -3497,7 +3499,11 @@ PyDataMem_NEW(size_t size)
 {
     void *result;
 
-    result = malloc(size);
+    npy_intp realsize = size+sizeof(npy_intp);
+    result = mmap(NULL, realsize, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    *((npy_intp*)result) = realsize;
+    result += sizeof(npy_intp);
+
     if (_PyDataMem_eventhook != NULL) {
         NPY_ALLOW_C_API_DEF
         NPY_ALLOW_C_API
@@ -3518,7 +3524,12 @@ PyDataMem_NEW_ZEROED(size_t size, size_t elsize)
 {
     void *result;
 
-    result = calloc(size, elsize);
+    npy_intp realsize = size+sizeof(npy_intp);
+    result = mmap(NULL, realsize, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    *((npy_intp*)result) = realsize;
+    result += sizeof(npy_intp);
+    memset(result, 0, size);
+
     if (_PyDataMem_eventhook != NULL) {
         NPY_ALLOW_C_API_DEF
         NPY_ALLOW_C_API
@@ -3537,7 +3548,10 @@ PyDataMem_NEW_ZEROED(size_t size, size_t elsize)
 NPY_NO_EXPORT void
 PyDataMem_FREE(void *ptr)
 {
-    free(ptr);
+    ptr -= sizeof(npy_intp);
+    npy_intp realsize = *((npy_intp*)ptr);
+    munmap(ptr, realsize);
+
     if (_PyDataMem_eventhook != NULL) {
         NPY_ALLOW_C_API_DEF
         NPY_ALLOW_C_API
@@ -3557,6 +3571,18 @@ PyDataMem_RENEW(void *ptr, size_t size)
 {
     void *result;
 
+    if(size > 0)
+    {
+        npy_intp realsize = size+sizeof(npy_intp);
+        result = mmap(NULL, realsize, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+        *((npy_intp*)result) = realsize;
+        result += sizeof(npy_intp);
+        memcpy(result, ptr, size);
+    }
+    ptr -= sizeof(npy_intp);
+    npy_intp realsize = *((npy_intp*)ptr);
+    munmap(ptr, realsize);
+
     result = realloc(ptr, size);
     if (_PyDataMem_eventhook != NULL) {
         NPY_ALLOW_C_API_DEF
@@ -3567,6 +3593,8 @@ PyDataMem_RENEW(void *ptr, size_t size)
         }
         NPY_DISABLE_C_API
     }
+    if(size == 0)
+        return NULL;
     return (char *)result;
 }
 
