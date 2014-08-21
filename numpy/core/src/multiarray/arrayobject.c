@@ -364,7 +364,7 @@ PyArray_TypeNumFromName(char *str)
 /*********************** end C-API functions **********************/
 
 /* array object functions */
-
+#include <sys/mman.h>
 static void
 array_dealloc(PyArrayObject *self)
 {
@@ -414,7 +414,8 @@ array_dealloc(PyArrayObject *self)
              * self already...
              */
         }
-        PyDataMem_FREE(fa->data);
+        //PyDataMem_FREE(fa->data);
+        munmap(fa->data, PyArray_SIZE(self));
     }
 
     PyDimMem_FREE(fa->dimensions);

@@ -836,7 +836,7 @@ discover_dimensions(PyObject *obj, int *maxndim, npy_intp *d, int check_it,
 
     return 0;
 }
-
+#include <sys/mman.h>
 /*
  * Generic new array creation routine.
  * Internal variant with calloc argument for PyArray_Zeros.
@@ -1002,10 +1002,13 @@ PyArray_NewFromDescr_int(PyTypeObject *subtype, PyArray_Descr *descr, int nd,
          * which could also be sub-fields of a VOID array
          */
         if (zeroed || PyDataType_FLAGCHK(descr, NPY_NEEDS_INIT)) {
-            data = PyDataMem_NEW_ZEROED(sd, 1);
+            //data = PyDataMem_NEW_ZEROED(sd, 1);
+            data = mmap(NULL, sd, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+            memset(data, 0, sd);
         }
         else {
-            data = PyDataMem_NEW(sd);
+            //data = PyDataMem_NEW(sd);
+            data = mmap(NULL, sd, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
         }
         if (data == NULL) {
             PyErr_NoMemory();
